@@ -546,7 +546,7 @@ function __kubeswitch_util_message --description="Prints a message"
 	end
 
 	# Print the message.
-	printf "%s%s%s" "$active_color_code" (printf -- $argv) "$reset_color_code"
+	printf "%s%s%s\n" "$active_color_code" (printf -- $argv) "$reset_color_code"
 	return 0
 end
 
