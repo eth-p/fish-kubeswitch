@@ -142,7 +142,8 @@ function kubeswitch --description="Change kubectx configuration for this fish in
 	return $return_status
 end
 
-function __kubeswitch_update_inherit_env --on-event='kubeswitch'
+function __kubeswitch_update_inherit_env --on-event='kubeswitch' \
+--description="Update the values inherited by kubeswitch inherit-env"
 	set -U __kubeswitch_last_kubeconfig "$KUBECONFIG"
 	set -U __kubeswitch_last_context    "$KUBESWITCH_CONTEXT"
 	set -U __kubeswitch_last_namespace  "$KUBESWITCH_NAMESPACE"
@@ -245,7 +246,7 @@ function __kubeswitch_help_kubeswitch_kubectl_alias --description="Show help for
 	end 1>&2
 end
 
-function __kubeswitch_help_kubeswitch_inherit_env --description="Show help for kubeswitch kubectl-alias"
+function __kubeswitch_help_kubeswitch_inherit_env --description="Show help for kubeswitch inherit-env"
 	[ -n "$_KS_SELF" ] || set -l _KS_SELF "kubeswitch kubectl-alias"
 
 	begin
