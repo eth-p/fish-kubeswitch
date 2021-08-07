@@ -566,7 +566,10 @@ function __kubeswitch_subcmd_show --description="Inherit kubeswitch environment"
 			__kubeswitch_util_show ($ksi_yq | string collect --no-trim-newlines) \
 				--var="KSI_YAML"
 		else
-			echo "--- user-defined information ---"
+			if [ -z "$_flag_ksi" ]
+				echo "--- user-defined information ---"
+			end
+
 			if [ "$_KS_COLOR" = true ]
 				set ksi_yq $ksi_yq[1] '--colors' $ksi_yq[2..-1]
 			else
@@ -1171,8 +1174,9 @@ function __kubeswitch_ksi_extract --description="Extract the active fields from 
 		(__kubeswitch_util_filename (__kubeswitch_current_kubeconfig))
 
 	# Match the keys against the environment.
-	set -l matching_keys
+	set -l matching_indices
 	set -l key
+	set -l index 0
 	for key in $keys
 		set -l match_string "$_flag_namespace@$_flag_context"
 		set -l match_query "$key"
@@ -1190,18 +1194,20 @@ function __kubeswitch_ksi_extract --description="Extract the active fields from 
 		end
 
 		if string match -q -- "$match_query" "$match_string"
-			set -a matching_keys "$key"
+			set -a matching_indices "$index"
 		end
+
+		set index (math $index + 1)
 	end
 
 	# Generate a yq command for extracting from the matching keys.
 	set -l yq_query (
-		string replace --all --regex -- '([\\\\"])' '\\\\$1' $matching_keys |
-		string replace --regex -- '^(.*)$' '.["$1"]' |
+		string replace --all --regex -- '([\\\\"])' '\\\\$1' $matching_indices |
+		string replace --regex -- '^(.*)$' '.[$1].value' |
 		string join -- ' * '
 	)
 
-	set -l yq_command 'yq' 'eval' '--' $yq_query "$file"
+	set -l yq_command 'yq' 'eval' '--' "to_entries | $yq_query" "$file"
 	for key in $matching_keys
 		set -a yq_query "$key"
 	end
