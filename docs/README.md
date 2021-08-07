@@ -24,6 +24,9 @@ Create an alias for `kubeswitch kubectl`.
 [**kubeswitch inherit-env**](kubeswitch-inherit-env.md)  
 Inherit the `kubeswitch` environment that was most recently set by another instance of fish.
 
+[**kubeswitch show**](kubeswitch-show.md)  
+Show information about the `kubeswitch` environment.
+
 
 
 

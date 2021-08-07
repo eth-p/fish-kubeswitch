@@ -72,7 +72,8 @@ function kubeswitch --description="Change kubectx configuration for this fish in
 				"config"    "Change the active kubeconfig file" \
 				"context"   "Change the active kubeconfig context" \
 				"namespace" "Change the current namespace" \
-				"kubectl"   "Run kubectl"
+				"kubectl"   "Run kubectl" \
+				"show"      "Show kubeswitch environment info"
 		else
 			set -l completions
 			if [ "$subcommand" = "" ] || [ "$subcommand" = "config" ]
@@ -92,6 +93,9 @@ function kubeswitch --description="Change kubectx configuration for this fish in
 			end
 			if [ "$subcommand" = "" ] || [ "$subcommand" = "inherit-env" ]
 				set -a completions "inherit-env"
+			end
+			if [ "$subcommand" = "" ] || [ "$subcommand" = "show" ]
+				set -a completions "show"
 			end
 			printf "%s\n" $completions
 		end
@@ -123,6 +127,10 @@ function kubeswitch --description="Change kubectx configuration for this fish in
 
 	case "inherit-env"
 		__kubeswitch_subcmd_inherit_env $args
+		set return_status $status
+
+	case "show"
+		__kubeswitch_subcmd_show $args
 		set return_status $status
 
 	case "help" ""
@@ -166,6 +174,7 @@ function __kubeswitch_help_kubeswitch --description="Show help for kubeswitch"
 		echo "    $_KS_SELF kubectl          : run kubectl within the kubeswitch environment"
 		echo "    $_KS_SELF kubectl-alias    : create an alias for 'kubeswitch kubectl'"
 		echo "    $_KS_SELF inherit-env      : inherit the kubeswitch environment"
+		echo "    $_KS_SELF show             : show kubeswitch environment info"
 		echo ""
 		echo "OPTIONS:"
 		echo "    --no-color       : disable color output"
@@ -247,7 +256,7 @@ function __kubeswitch_help_kubeswitch_kubectl_alias --description="Show help for
 end
 
 function __kubeswitch_help_kubeswitch_inherit_env --description="Show help for kubeswitch inherit-env"
-	[ -n "$_KS_SELF" ] || set -l _KS_SELF "kubeswitch kubectl-alias"
+	[ -n "$_KS_SELF" ] || set -l _KS_SELF "kubeswitch inherit-env"
 
 	begin
 		echo "Inherit the most-recently-set kubeswitch environment from another fish instance."
@@ -255,6 +264,20 @@ function __kubeswitch_help_kubeswitch_inherit_env --description="Show help for k
 		echo "USAGE:"
 		echo "    $_KS_SELF               : inherit the kubeswitch environment"
 		echo "    $_KS_SELF -h, --help    : show this message"
+	end 1>&2
+end
+
+function __kubeswitch_help_kubeswitch_show --description="Show help for kubeswitch show"
+	[ -n "$_KS_SELF" ] || set -l _KS_SELF "kubeswitch show"
+
+	begin
+		echo "Show info about the kubeswitch environment."
+		echo ""
+		echo "USAGE:"
+		echo "    $_KS_SELF                : show basic info in a human-readable format"
+		echo "    $_KS_SELF --porcelain    : show info in a fish eval compatible format"
+		echo "    $_KS_SELF --ksi          : extract user-defined metadata from the kubeswitch environment"         
+		echo "    $_KS_SELF -h, --help     : show this message"
 	end 1>&2
 end
 
@@ -471,9 +494,94 @@ function __kubeswitch_subcmd_inherit_env --description="Inherit kubeswitch envir
 	end
 
 	# Copy the __kubeswitch_last_* variables.
-	[ -n "$__kubeswitch_last_kubeconfig" ] && set -gx KUBECONFIG "$__kubeswitch_last_kubeconfig"
-	[ -n "$__kubeswitch_last_context"    ] && set -gx KUBESWITCH_CONTEXT "$__kubeswitch_last_context"
-	[ -n "$__kubeswitch_last_namespace"  ] && set -gx KUBESWITCH_NAMESPACE "$__kubeswitch_last_namespace"
+	if [ -n "$__kubeswitch_last_kubeconfig$__kubeswitch_last_context$__kubeswitch_last_namespace" ]
+		set -gx KUBECONFIG "$__kubeswitch_last_kubeconfig"
+		set -gx KUBESWITCH_CONTEXT "$__kub  eswitch_last_context"
+		set -gx KUBESWITCH_NAMESPACE "$__kubeswitch_last_namespace"
+	end
+
+	return 0
+end
+
+function __kubeswitch_subcmd_show --description="Inherit kubeswitch environment"
+	[ -n "$_KS_SELF" ] || set -l _KS_SELF "kubeswitch show"
+	argparse -n "$_KS_SELF" -x 'help,porcelain,ksi' \
+		'help' 'porcelain' 'ksi' -- $argv || return 1
+
+	# Handle the --help flag.
+	if [ -n "$_flag_help" ]
+		__kubeswitch_help_kubeswitch_show
+		return 0
+	end
+
+	# Handle the --porcelain flag.
+	set -g _KS_PORCELAIN false
+	[ -n "$_flag_porcelain" ] && set _KS_PORCELAIN true
+
+	# Print variables about the kubeswitch environment.
+	set -l kube_config    (__kubeswitch_current_kubeconfig)
+	set -l kube_context   (__kubeswitch_current_context)
+	set -l kube_namespace (__kubeswitch_current_namespace)
+	
+	if [ -z "$_flag_ksi" ]
+
+		__kubeswitch_util_show "$kube_config" \
+			--var="CONFIG_FILE" --description="kubeconfig file"
+		
+		__kubeswitch_util_show (__kubeswitch_util_filename "$kube_config") \
+			--var="CONFIG_NAME" --description="kubeconfig file name" \
+			--porcelain-only
+
+		__kubeswitch_util_show "$kube_context" \
+			--var="ACTIVE_CONTEXT" --description="kubectl context"
+
+		__kubeswitch_util_show $KUBESWITCH_CONTEXT \
+			--var="DECLARED_CONTEXT" --description="kubeswitch context" \
+			--porcelain-only
+		
+		__kubeswitch_util_show (__kubeswitch_list_context) \
+			--var="AVAILABLE_CONTEXTS" --description="kubeswitch context" \
+			--porcelain-only
+		
+		__kubeswitch_util_show "$kube_namespace" \
+			--var="ACTIVE_NAMESPACE" --description="kubectl namespace"
+
+		__kubeswitch_util_show $KUBESWITCH_NAMESPACE \
+			--var="DECLARED_NAMESPACE" --description="kubeswitch namespace" \
+			--porcelain-only
+	
+	end
+	
+	# Get the yq command for extracting user-supplied info from a .ksi file.
+	set -l ksi_yq (
+		__kubeswitch_ksi_extract --print-command \
+			--context="$kube_context" \
+			--namespace="$kube_namespace" \
+			--config-file="$kube_config"
+	)
+
+	# Run the yq command.
+	if [ (count $ksi_yq) -gt 0 ]
+		if [ "$_KS_PORCELAIN" = true ]
+			__kubeswitch_util_show ($ksi_yq | string collect --no-trim-newlines) \
+				--var="KSI_YAML"
+		else
+			echo "--- user-defined information ---"
+			if [ "$_KS_COLOR" = true ]
+				set ksi_yq $ksi_yq[1] '--colors' $ksi_yq[2..-1]
+			else
+				set ksi_yq $ksi_yq[1] '--no-colors' $ksi_yq[2..-1]
+			end
+
+			$ksi_yq
+			if [ $status -ne 0 ] && [ -n "$_flag_ksi" ]
+				return 1
+			end
+		end
+	end
+
+	# Cleanup.
+	set -g -e _KS_PORCELAIN
 	return 0
 end
 
@@ -527,27 +635,89 @@ function __kubeswitch_util_filename --description="Extract the file name from a 
 		(__kubeswitch_util_extname "$argv[1]")
 end
 
+function __kubeswitch_util_color --description="Print the first available color"
+	if [ "$_KS_COLOR" != true ]
+		return 0
+	end
+
+	# Collect possible variables.
+	set -l var
+	set -l vars
+	set -l fallback
+	set -l to_fallback false
+	for var in $argv
+		if "$to_fallback"
+			set -a fallback $var
+			continue
+		end
+
+		if [ "$var" = "--" ]
+			set to_fallback true
+			continue
+		end
+
+		set -a vars $var
+	end
+
+	# Try all the listed variables.
+	for var in $vars
+		eval "set -l color \$$var"
+		if [ (count $color) -ne 0 ]
+			set_color $color
+			return $status
+		end
+	end
+
+	# Use the fallback
+	if [ (count $fallback) -gt 0 ]
+		set_color $fallback
+		return $status
+	end
+
+	# No color.
+	return 1
+end
+
 function __kubeswitch_util_message --description="Prints a message"
 	if [ "$_KS_QUIET" = "true" ]
 		return 0
 	end
 
 	# Get the color codes.
-	set -l active_color_code ''
-	set -l reset_color_code ''
-	if [ "$_KS_COLOR" = true ]
-		set -l active_color $kubeswitch_color_message
-		if [ (count $active_color) -eq 0 ] 
-			set active_color green
-		end
-
-		set active_color_code (set_color $active_color)
-		set reset_color_code (set_color normal)
-	end
+	set -l active_color_code (__kubeswitch_util_color kubeswitch_color_message -- green)
+	set -l reset_color_code (__kubeswitch_util_color -- normal)
 
 	# Print the message.
 	printf "%s%s%s\n" "$active_color_code" (printf -- $argv) "$reset_color_code"
 	return 0
+end
+
+function __kubeswitch_util_show --description="Prints info about a kubeswitch environment variable"
+	argparse 'var=' 'description=' 'porcelain-only' -- $argv || return 1
+
+	# If porcelain mode, print it in a fish-eval'able format.
+	if [ "$_KS_PORCELAIN" = "true" ]
+		printf "set -l %s" $_flag_var
+		if [ (count $argv) -gt 0 ]
+			printf ' %s' (string escape $argv)
+		end
+		printf ";\n"
+		return 0
+	end
+
+	# If it's only meant to be printed in porcelain mode, don't print it.
+	if [ -n "$_flag_porcelain_only" ]
+		return 0
+	end
+
+	# Print it.
+	set -l active_color_code (__kubeswitch_util_color kubeswitch_color_show_var -- cyan)
+	set -l reset_color_code (__kubeswitch_util_color -- normal)
+	printf "%s%-20s%s %s\n" \
+		"$active_color_code" \
+		"$_flag_description:" \
+		"$reset_color_code" \
+		"$argv"
 end
 
 
@@ -598,17 +768,8 @@ function __kubeswitch_do_interactive --description="Use fzf to pick an option"
 	end
 	
 	# No fzf or disabled? Just list the options.
-	set -l active_color_code ''
-	set -l reset_color_code ''
-	if [ "$_KS_COLOR" = true ]
-		set -l active_color $kubeswitch_color_active
-		if [ (count $active_color) -eq 0 ] 
-			set active_color $fish_color_search_match
-		end
-
-		set active_color_code (set_color $active_color)
-		set reset_color_code (set_color normal)
-	end
+	set -l active_color_code (__kubeswitch_util_color kubeswitch_color_active fish_color_search_match)
+	set -l reset_color_code (__kubeswitch_util_color -- normal)
 
 	if [ (count $list_items) -eq 0 ]
 		echo "[nothing available]" 1>&2
@@ -754,8 +915,8 @@ function __kubeswitch_suggest_kubeconfig --description="Suggest a kubeconfig fil
 		# Use kubectl to extract the cluster name.
 		set -l cluster (
 			KUBECONFIG="$file" command \
-			kubectl config view --minify --output='jsonpath={..clusters[0].name}'
-		) 2>/dev/null
+			kubectl config view --minify --output='jsonpath={..clusters[0].name}' 2>/dev/null
+		)
 
 		# Print the config file name and cluster name.
 		printf "%s\t%s\n" \
@@ -962,5 +1123,96 @@ function __kubeswitch_change_namespace --description="Change the current kubectl
 	# kubernetes context has changed.
 	emit kubeswitch namespace "$namespace" $_flag_universal
 	return 0
+end
+
+
+
+# -----------------------------------------------------------------------------
+# Helpers: Kubectl KSI
+# -----------------------------------------------------------------------------
+
+function __kubeswitch_ksi_file --description="Get the .ksi file for the current config"
+	argparse 'config-file=' -- $argv || return 1
+	
+	[ -n "$_flag_config_file" ] || set _flag_config_file (__kubeswitch_current_kubeconfig)
+	
+	printf "%s/%s.%s\n" \
+		(dirname -- "$_flag_config_file") \
+		(__kubeswitch_util_filename "$_flag_config_file") \
+		"ksi"
+end
+
+function __kubeswitch_ksi_extract --description="Extract the active fields from a .ksi file"
+	argparse 'config-file=' 'config-name=' 'context=' 'namespace=' 'print-command' \
+		-- $argv || return 1
+
+	# Ensure yq is installed.
+	if ! command -vq yq
+		return 2
+	end
+
+	# Find the .ksi file to read from.
+	set -l file (__kubeswitch_ksi_file --config-file="$_flag_config_file")
+	if [ ! -f "$file" ]
+		return 1
+	end
+
+	# Get the list of keys.
+	set -l keys (
+		yq eval 'keys' "$file" \
+		| string match -- '- *' \
+		| string replace --regex '^- "(.*)"' '$1'
+	) || return 1
+
+	# Get default options.
+	[ -n "$_flag_context" ] || set _flag_context (__kubeswitch_current_context)
+	[ -n "$_flag_namespace" ] || set _flag_namespace (__kubeswitch_current_namespace)
+	[ -n "$_flag_config_name" ] || set _flag_config_name \
+		(__kubeswitch_util_filename (__kubeswitch_current_kubeconfig))
+
+	# Match the keys against the environment.
+	set -l matching_keys
+	set -l key
+	for key in $keys
+		set -l match_string "$_flag_namespace@$_flag_context"
+		set -l match_query "$key"
+
+		switch "$key"
+		case "[file=]*"
+			set match_string "$_flag_config_name"
+			set match_query (string sub --start=8 -- "$key")
+		case "[namespace=]*"
+			set match_string "$_flag_namespace"
+			set match_query (string sub --start=13 -- "$key")
+		case "[context=]*"
+			set match_string "$_flag_context"
+			set match_query (string sub --start=11 -- "$key")
+		end
+
+		if string match -q -- "$match_query" "$match_string"
+			set -a matching_keys "$key"
+		end
+	end
+
+	# Generate a yq command for extracting from the matching keys.
+	set -l yq_query (
+		string replace --all --regex -- '([\\\\"])' '\\\\$1' $matching_keys |
+		string replace --regex -- '^(.*)$' '.["$1"]' |
+		string join -- ' * '
+	)
+
+	set -l yq_command 'yq' 'eval' '--' $yq_query "$file"
+	for key in $matching_keys
+		set -a yq_query "$key"
+	end
+
+	# Run yq.
+	if [ -n "$_flag_print_command" ]
+		printf "%s\n" $yq_command
+		return 0
+	end
+
+	$yq_command
+	return $status
 end
 
