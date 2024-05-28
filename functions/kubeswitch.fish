@@ -1,5 +1,5 @@
 # =============================================================================
-# fish-kubeswitch | Copyright (C) 2021 eth-p
+# fish-kubeswitch | Copyright (C) 2021-2024 eth-p
 #
 # A kubectx/kubens replacement that sets the kubectl config file, context, and
 # namespace for each individual instance of the fish shell.
@@ -1155,14 +1155,23 @@ function __kubeswitch_ksi_extract --description="Extract the active fields from 
 	end
 
 	# Find the .ksi file to read from.
-	set -l file (__kubeswitch_ksi_file --config-file="$_flag_config_file")
-	if [ ! -f "$file" ]
+	set -l files
+
+	set -l specific_file (__kubeswitch_ksi_file --config-file="$_flag_config_file")
+	set -l general_file (dirname -- "$specific_file")/"_common.ksi"
+	for file in $general_file $specific_file
+		if [ -f "$file" ]
+			set -a files "$file"
+		end
+	end
+
+	if [ (count $files) -lt 1 ]
 		return 1
 	end
 
 	# Get the list of keys.
 	set -l keys (
-		yq eval 'keys' "$file" \
+		yq eval-all '. as $item ireduce ({}; . *+ $item ) | keys' $files \
 		| string match -- '- *' \
 		| string replace --regex '^- "(.*)"' '$1'
 	) || return 1
@@ -1207,7 +1216,7 @@ function __kubeswitch_ksi_extract --description="Extract the active fields from 
 		string join -- ' * '
 	)
 
-	set -l yq_command 'yq' 'eval' '--' "to_entries | $yq_query" "$file"
+	set -l yq_command 'yq' 'eval-all' '--' ". as \$item ireduce ({}; . *+ \$item ) | to_entries | $yq_query" $files
 	for key in $matching_keys
 		set -a yq_query "$key"
 	end

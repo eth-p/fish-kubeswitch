@@ -6,7 +6,7 @@ A `kubectx`/`kubens` replacement that sets the `kubectl` config file, context, a
 
 ## Features
 
-- Change the `kubectl` config file, context, and namespace only one fish instance.
+- Change the `kubectl` config file, context, and namespace of only one fish instance.
   (No more outdated/incorrect prompts!)
 - Barebones installation, easy configuration.
 

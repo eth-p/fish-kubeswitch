@@ -18,7 +18,7 @@ Show information about the `kubeswitch` environment.
 
 > **Note:** This feature requires [yq](https://github.com/mikefarah/yq) version 4 to be installed.
 
-Kubeswitch allows the user to define additional metadata in `.ksi` (kubeswitch information) files. These files should be named the same as the kubeconfig file, but with a `.ksi` file extension. For example, if the config file is named `docker`, kubeswitch will read metadata from `docker.ksi`.
+Kubeswitch allows the user to define additional metadata in `.ksi` (kubeswitch information) files. These files should be named the same as the kubeconfig file, but with a `.ksi` file extension. For example, if the config file is named `docker`, kubeswitch will read metadata from `docker.ksi`. Metadata will also be sourced from a `_common.ksi` file if it exists.
 
 A kubeswitch information file is yaml, where the root keys are compared matched the active environment. The matching maps will be merged in order, with the most-recent value taking precedence.
 
