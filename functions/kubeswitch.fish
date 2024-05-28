@@ -496,7 +496,7 @@ function __kubeswitch_subcmd_inherit_env --description="Inherit kubeswitch envir
 	# Copy the __kubeswitch_last_* variables.
 	if [ -n "$__kubeswitch_last_kubeconfig$__kubeswitch_last_context$__kubeswitch_last_namespace" ]
 		set -gx KUBECONFIG "$__kubeswitch_last_kubeconfig"
-		set -gx KUBESWITCH_CONTEXT "$__kub  eswitch_last_context"
+		set -gx KUBESWITCH_CONTEXT "$__kubeswitch_last_context"
 		set -gx KUBESWITCH_NAMESPACE "$__kubeswitch_last_namespace"
 	end
 
