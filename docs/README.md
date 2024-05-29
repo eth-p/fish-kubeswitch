@@ -66,6 +66,10 @@ This is used as the search path for the `kubeswitch config` subcommand.
 An array of valid extensions for `kubectl` configuration files.  
 This is used to find files for `kubeswitch config` subcommand.
 
+`$kubeswitch_kubectl` (array)  
+The `kubectl` command to execute.  
+This can be changed to target a specific version of `kubectl`.
+
 `$kubeswitch_color_active` (array)  
 An array of `set_color` arguments used to highlight the active config file/context/namespace.
 

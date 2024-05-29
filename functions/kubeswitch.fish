@@ -183,6 +183,7 @@ function __kubeswitch_help_kubeswitch --description="Show help for kubeswitch"
 		echo "CONFIG:"
 		echo "    \$kubeswitch_kubeconfig_path    : lookup path for kubeconfig files"
 		echo "    \$kubeswitch_kubeconfig_exts    : extensions for kubeconfig files"
+		echo "    \$kubeswitch_kubectl            : the kubectl command"
 	end 1>&2
 end
 
@@ -446,12 +447,18 @@ function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubes
 		set -a kube_args --namespace="$namespace"
 	end
 
+	# Get the kubectl command.
+	set -l kubectl kubectl
+	if [ -n "$kubeswitch_kubectl" ]
+		set kubectl $kubeswitch_kubectl
+	end
+
 	# Run kubectl.
 	if [ -n "$file" ]
-		KUBECONFIG="$file" command kubectl $kube_args $argv
+		KUBECONFIG="$file" command $kubectl $kube_args $argv
 		return $status
 	else
-		command kubectl $kube_args $argv
+		command $kubectl $kube_args $argv
 		return $status
 	end
 end
