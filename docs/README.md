@@ -70,6 +70,9 @@ This is used to find files for `kubeswitch config` subcommand.
 The `kubectl` command to execute.  
 This can be changed to target a specific version of `kubectl`.
 
+`$kubeswitch_unsupported_plugins` (array)  
+A blacklist of `kubectl` plugins that don't support `--namespace` and `--context`.  
+
 `$kubeswitch_color_active` (array)  
 An array of `set_color` arguments used to highlight the active config file/context/namespace.
 

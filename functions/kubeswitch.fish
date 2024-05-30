@@ -453,12 +453,18 @@ function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubes
 		set kubectl $kubeswitch_kubectl
 	end
 
+	# Check if the kubectl plugin is blacklisted.
+	set -l blacklist "krew" $kubeswitch_unsupported_plugins
+	if test (count $argv) -gt 0 && contains -- "$argv[1]" $blacklist
+		set kube_args
+	end
+
 	# Run kubectl.
 	if [ -n "$file" ]
-		KUBECONFIG="$file" command $kubectl $kube_args $argv
+		KUBECONFIG="$file" command $kubectl $kube_args $argv 
 		return $status
 	else
-		command $kubectl $kube_args $argv
+		command $kubectl $kube_args $argv 
 		return $status
 	end
 end
