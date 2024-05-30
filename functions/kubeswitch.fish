@@ -432,11 +432,22 @@ function __kubeswitch_subcmd_namespace --description="Change the kubectl namespa
 end
 
 function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubeswitch context"
+	argparse -i "c/context=" "n/namespace=" -- $argv
+
 	set -l kube_args
 
 	set -l file      (__kubeswitch_current_kubeconfig)
 	set -l context   (__kubeswitch_current_context)
 	set -l namespace (__kubeswitch_current_namespace)
+
+	# Override context/namespace.
+	if [ -n "$_flag_context" ]
+		set context "$_flag_context"
+	end
+
+	if [ -n "$_flag_namespace" ]
+		set namespace "$_flag_namespace"
+	end
 
 	# Append arguments.
 	if [ -n "$context" ]
@@ -461,10 +472,10 @@ function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubes
 
 	# Run kubectl.
 	if [ -n "$file" ]
-		KUBECONFIG="$file" command $kubectl $kube_args $argv 
+		KUBECONFIG="$file" command $kubectl $argv $kube_args
 		return $status
 	else
-		command $kubectl $kube_args $argv 
+		command $kubectl $argv $kube_args
 		return $status
 	end
 end
