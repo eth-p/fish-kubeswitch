@@ -432,8 +432,6 @@ function __kubeswitch_subcmd_namespace --description="Change the kubectl namespa
 end
 
 function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubeswitch context"
-	argparse -i "c/context=" "n/namespace=" -- $argv
-
 	set -l kube_args
 
 	set -l file      (__kubeswitch_current_kubeconfig)
@@ -441,12 +439,45 @@ function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubes
 	set -l namespace (__kubeswitch_current_namespace)
 
 	# Override context/namespace.
-	if [ -n "$_flag_context" ]
-		set context "$_flag_context"
-	end
+	set -l user_args
+	set -l user_passthrough_args
+	set -l i 1
+	while [ $i -le (count $argv) ]
+		set -l arg "$argv[$i]"
+		set i (math $i + 1)
 
-	if [ -n "$_flag_namespace" ]
-		set namespace "$_flag_namespace"
+		if [ "$arg" = "--" ]
+			set user_passthrough_args "--" $argv[$i..]
+			break
+		end
+
+		set -l argname
+		set -l argvalue
+		if string match -q --regex -- '^--(?<argname>[^=]+)(?:=(?<argvalue>.*))?$' "$arg"
+			set -l prev_i "$i"
+			if [ -z "$argvalue" ]
+				set argvalue "$argv[$i]"
+				set i (math $i + 1)
+			end
+
+			if [ -n "$argvalue" ]
+				switch "$argname"
+					case "context"
+						set context "$argvalue"
+						continue
+					case "namespace"
+						set namespace "$argvalue"
+						continue
+				end
+			end
+
+			# Restore the argument value if we didn't consume it.
+			set i "$prev_i"
+		end
+
+		# An argument to pass along.
+		set -a user_args "$arg"
+		continue
 	end
 
 	# Append arguments.
@@ -472,10 +503,10 @@ function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubes
 
 	# Run kubectl.
 	if [ -n "$file" ]
-		KUBECONFIG="$file" command $kubectl $argv $kube_args
+		KUBECONFIG="$file" command $kubectl $user_args $kube_args $user_passthrough_args
 		return $status
 	else
-		command $kubectl $argv $kube_args
+		command $kubectl $user_args $kube_args $user_passthrough_args
 		return $status
 	end
 end
