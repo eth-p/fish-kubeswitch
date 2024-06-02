@@ -501,6 +501,12 @@ function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubes
 		set kube_args
 	end
 
+	# If autocompleting, move the to-be-completed word to the end.
+	if test (count $argv) -gt 1 && test "$argv[1]" = "__complete"
+		set -a user_passthrough_args $user_args[(count $user_args)]
+		set -e user_args[(count $user_args)]
+	end
+
 	# Run kubectl.
 	if [ -n "$file" ]
 		KUBECONFIG="$file" command $kubectl $user_args $kube_args $user_passthrough_args
