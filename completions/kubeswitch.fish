@@ -54,3 +54,7 @@ complete -c "kubeswitch" -f \
 	-n "__fish_seen_subcommand_from (kubeswitch --complete-list-subcommands namespace)" \
 	-s 'L' -l 'list' -d 'List the available namespaces'
 
+# Completions for the 'kubectl' subcommand.
+complete -c "kubeswitch" -f -k \
+	-n "__fish_seen_subcommand_from (kubeswitch --complete-list-subcommands kubectl)" \
+	-a '(complete --do-complete (commandline -p | cut -d" " -f 2-))'
