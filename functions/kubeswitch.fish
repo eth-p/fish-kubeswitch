@@ -1349,6 +1349,11 @@ function __kubeswitch_ksi_extract --description="Extract the active fields from 
 		string join -- ' * '
 	)
 
+	# If the query is empty, return without calling yq.
+	if [ -z "$yq_query" ]
+		return 0
+	end
+
 	set -l yq_command 'yq' 'eval-all' '--' ". as \$item ireduce ({}; . *+ \$item ) | to_entries | $yq_query" $files
 	for key in $matching_keys
 		set -a yq_query "$key"
