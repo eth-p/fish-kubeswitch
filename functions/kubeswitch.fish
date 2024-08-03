@@ -862,6 +862,86 @@ function __kubeswitch_util_show --description="Prints info about a kubeswitch en
 end
 
 
+# -----------------------------------------------------------------------------
+# Helpers: Nested Invocation Variables
+# -----------------------------------------------------------------------------
+
+function __kubeswitch_ksvar --description="Print a kubeswitch nested variable"
+	# argparse 'x-no-options' -- $argv || return 1
+	# if [ (count $argv) -ne 1 ]
+	# 	echo "usage: __kubeswitch_ksvar [var]" 1>&2
+	# 	return 1
+	# end
+
+	set --query "__kubeswitch_ksvar_$argv[1][$__kubeswitch_ksvarlv]" || return 1
+	eval "printf '%s\n' \"\$__kubeswitch_ksvar_$argv[1][$__kubeswitch_ksvarlv]\""
+end
+
+function __kubeswitch_ksvar_set --description="Set a kubeswitch nested variable"
+	argparse 'default' 'inherit' -- $argv || return 1
+	if [ (count $argv) -lt 1 ]
+		echo "usage: __kubeswitch_ksvar_set [var] [value]" 1>&2
+		return 1
+	end
+
+	# If '--default', only set if it hasn't been set already.
+	if [ -n "$_flag_default" ] && __kubeswitch_ksvar "$argv[1]" >/dev/null
+		return 0
+	end
+
+	# If '--inherit' and not already set, inherit from a higher level.
+	if [ -n "$_flag_inherit" ]
+		for level in (seq $__kubeswitch_ksvarlv 1)
+			set -l value_at_level (eval "printf '%s' \"\$__kubeswitch_ksvar_$argv[1][$level]\"")
+			if [ -n "$value_at_level" ]
+				set argv[2] "$value_at_level"
+				break
+			end
+		end
+	end
+
+	# Validate arguments and set the variable.
+	if [ (count $argv) -ne 2 ]
+		echo "usage: __kubeswitch_ksvar_set [var] [value]" 1>&2
+		return 1
+	end
+
+	set -g "__kubeswitch_ksvar_$argv[1][$__kubeswitch_ksvarlv]" "$argv[2]"
+	return 0
+end
+
+function __kubeswitch_ksvar_level --description="Adjusts the nesting level for kubeswitch nested variables"
+	argparse -x 'inc,dec' 'inc' 'dec' -- $argv || return 1
+	if [ (count $argv) -ne 0 ] || [ -z "$_flag_inc$_flag_dec" ]
+		echo "usage: __kubeswitch_ksvar_level [--inc|--dec]" 1>&2
+		return 1
+	end
+
+	if [ -z "$__kubeswitch_ksvarlv" ]
+		set -g __kubeswitch_ksvarlv 0
+	end
+
+	# If '--inc', increment the 'ksvarlv' variable by 1.
+	if [ -n "$_flag_inc" ]
+		set __kubeswitch_ksvarlv (math "$__kubeswitch_ksvarlv" + 1)
+		return 0
+	end
+
+	# If '--dec', decrement the 'ksvarlv' variable by 1.
+	# When it reaches 0, clear all the 'ksvar' variables.
+	if [ -n "$_flag_dec" ]
+		set __kubeswitch_ksvarlv (math "$__kubeswitch_ksvarlv" - 1)
+		if [ "$__kubeswitch_ksvarlv" -le 0 ]
+			set -e __kubeswitch_ksvarlv
+			for var in (set -S | string match --regex '^\$__kubeswitch_ksvar_[^:]*' | string sub --start=2)
+				set -e "$var"
+			end
+		end
+		return 0
+	end
+end
+
+
 
 # -----------------------------------------------------------------------------
 # Helpers: Interactive Selection
