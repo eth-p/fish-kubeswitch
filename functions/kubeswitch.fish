@@ -805,7 +805,7 @@ function __kubeswitch_util_message --description="Prints a message"
 	set -l reset_color_code (__kubeswitch_util_color -- normal)
 
 	# Print the message.
-	printf "%s%s%s\n" "$active_color_code" (printf $__promptfessional_printf_accept_pattern_variable $argv) "$reset_color_code"
+	printf "%s%s%s\n" "$active_color_code" (printf $argv) "$reset_color_code"
 	return 0
 end
 
