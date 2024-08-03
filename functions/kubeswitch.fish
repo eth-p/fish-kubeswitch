@@ -15,27 +15,25 @@ function kubeswitch --description="Change kubectx configuration for this fish in
 		'q/quiet' 'h/help' 'no-color' 'force-color' \
 		'complete-list-subcommands' 'complete-suggestions' -- $argv || return 1
 
-	# Handle kubeswitch nesting.
-	if [ -z "$_KS_LEVEL" ]
-		set -g _KS_LEVEL 0
-	end
-
-	set _KS_LEVEL (math "$_KS_LEVEL" + 1)
+	__kubeswitch_ksvar_level --inc
 
 	# Handle --no-color or --force-color flag.
-	set -g _KS_COLOR[$_KS_LEVEL] "false"
+	set -l use_color_default false
+	if [ -t 1 ]
+		set use_color_default true
+	end
+
+	__kubeswitch_ksvar_set use_color "$use_color_default" --default --inherit
 	if [ -n "$_flag_no_color" ]
-		set _KS_COLOR[$_KS_LEVEL] "false"
+		__kubeswitch_ksvar_set use_color false
 	else if [ -n "$_flag_force_color" ]
-		set _KS_COLOR[$_KS_LEVEL] "true"
-	else if [ -t 1 ]
-		set _KS_COLOR[$_KS_LEVEL] "true"
+		__kubeswitch_ksvar_set use_color true
 	end
 
 	# Handle the --quiet flag.
-	set -g _KS_QUIET[$_KS_LEVEL] "false"
+	__kubeswitch_ksvar_set quiet false --default --inherit
 	if [ -n "$_flag_quiet" ]
-		set _KS_QUIET[$_KS_LEVEL] "true"
+		__kubeswitch_ksvar_set quiet true
 	end
 
 	# Find the subcommand.
@@ -57,10 +55,12 @@ function kubeswitch --description="Change kubectx configuration for this fish in
 	end
 
 	# Set the name of the subcommand.
-	set -g _KS_SELF[$_KS_LEVEL] "$_"
-	if [ "$_KS_SELF[$_KS_LEVEL]" = "kubeswitch" ] && [ -n "$subcommand" ]
-		set _KS_SELF[$_KS_LEVEL] "$_ $subcommand"
+	set -l argv0 (status current-command)
+	if [ -n "$subcommand" ]
+		set argv0 "$argv0 $subcommand"
 	end
+
+	__kubeswitch_ksvar_set argv0 "$argv0" --default
 
 	# Handle the --help flag.
 	if [ -n "$_flag_help" ]
@@ -145,6 +145,7 @@ function kubeswitch --description="Change kubectx configuration for this fish in
 		set return_status $status
 
 	case "help" ""
+		__kubeswitch_ksvar_set argv0 (status current-command)
 		__kubeswitch_help_kubeswitch
 		set return_status 0
 
@@ -154,20 +155,7 @@ function kubeswitch --description="Change kubectx configuration for this fish in
 	end
 	
 	# Clean up and return.
-	set -e _KS_SELF[$_KS_LEVEL]
-	set -e _KS_COLOR[$_KS_LEVEL]
-	set -e _KS_QUIET[$_KS_LEVEL]
-	set -e _KS_PORCELAIN[$_KS_LEVEL]
-
-	set _KS_LEVEL (math "$_KS_LEVEL" - 1)
-	if [ "$_KS_LEVEL" -lt 1 ]
-		set -e _KS_SELF
-		set -e _KS_COLOR
-		set -e _KS_QUIET
-		set -e _KS_PORCELAIN
-		set -e _KS_LEVEL
-	end
-
+	__kubeswitch_ksvar_level --dec
 	return $return_status
 end
 
@@ -185,19 +173,18 @@ end
 # -----------------------------------------------------------------------------
 
 function __kubeswitch_help_kubeswitch --description="Show help for kubeswitch"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch"
-	set -l self $_KS_SELF[$_KS_LEVEL]
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch")
 
 	begin
 		echo "SUBCOMMANDS:"
-		echo "    $self config           : view or change the kubeconfig file"
-		echo "    $self context          : view or change the active kubectl context"
-		echo "    $self namespace        : view or change the active kubectl namespace"
-		echo "    $self kubectl          : run kubectl within the kubeswitch environment"
-		echo "    $self kubectl-alias    : create an alias for 'kubeswitch kubectl'"
-		echo "    $self inherit-env      : inherit the kubeswitch environment"
-		echo "    $self show             : show kubeswitch environment info"
-		echo "    $self wrapper-bin      : generate a shell script that wraps the kubectl binary"
+		echo "    $argv0 config           : view or change the kubeconfig file"
+		echo "    $argv0 context          : view or change the active kubectl context"
+		echo "    $argv0 namespace        : view or change the active kubectl namespace"
+		echo "    $argv0 kubectl          : run kubectl within the kubeswitch environment"
+		echo "    $argv0 kubectl-alias    : create an alias for 'kubeswitch kubectl'"
+		echo "    $argv0 inherit-env      : inherit the kubeswitch environment"
+		echo "    $argv0 show             : show kubeswitch environment info"
+		echo "    $argv0 wrapper-bin      : generate a shell script that wraps the kubectl binary"
 		echo ""
 		echo "OPTIONS:"
 		echo "    --no-color       : disable color output"
@@ -211,18 +198,17 @@ function __kubeswitch_help_kubeswitch --description="Show help for kubeswitch"
 end
 
 function __kubeswitch_help_kubeswitch_config --description="Show help for kubeswitch config"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch config"
-	set -l self $_KS_SELF[$_KS_LEVEL]
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch config")
 
 	begin
 		echo "View or change the configuration file used by 'kubeswitch kubectl'."
 		echo ""
 		echo "USAGE:"
-		echo "    $self                  : list/change config files"
-		echo "    $self <NAME>           : switch to the specified config file"
-		echo "    $self -L, --list       : list the available config files"
-		echo "    $self -c, --current    : show the current config file"
-		echo "    $self -h, --help       : show this message"
+		echo "    $argv0                  : list/change config files"
+		echo "    $argv0 <NAME>           : switch to the specified config file"
+		echo "    $argv0 -L, --list       : list the available config files"
+		echo "    $argv0 -c, --current    : show the current config file"
+		echo "    $argv0 -h, --help       : show this message"
 		echo ""
 		echo "CONFIG:"
 		#echo "    \$kubeswitch_enable_fzf      : if set to false, fzf will not be used"
@@ -231,18 +217,17 @@ function __kubeswitch_help_kubeswitch_config --description="Show help for kubesw
 end
 
 function __kubeswitch_help_kubeswitch_context --description="Show help for kubeswitch context"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch context"
-	set -l self $_KS_SELF[$_KS_LEVEL]
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch context")
 
 	begin
 		echo "View or change the active context used by 'kubeswitch kubectl'."
 		echo ""
 		echo "USAGE:"
-		echo "    $self                  : list/change contexts"
-		echo "    $self <NAME>           : switch to the specified context"
-		echo "    $self -L, --list       : list the available contexts"
-		echo "    $self -c, --current    : show the current context"
-		echo "    $self -h, --help       : show this message"
+		echo "    $argv0                  : list/change contexts"
+		echo "    $argv0 <NAME>           : switch to the specified context"
+		echo "    $argv0 -L, --list       : list the available contexts"
+		echo "    $argv0 -c, --current    : show the current context"
+		echo "    $argv0 -h, --help       : show this message"
 		echo ""
 		echo "CONFIG:"
 		#echo "    \$kubeswitch_enable_fzf      : if set to false, fzf will not be used"
@@ -251,18 +236,17 @@ function __kubeswitch_help_kubeswitch_context --description="Show help for kubes
 end
 
 function __kubeswitch_help_kubeswitch_namespace --description="Show help for kubeswitch namespace"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch namespace"
-	set -l self $_KS_SELF[$_KS_LEVEL]
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch namespace")
 
 	begin
 		echo "View or change the active namespace used by 'kubeswitch kubectl'."
 		echo ""
 		echo "USAGE:"
-		echo "    $self                  : list/change namespaces"
-		echo "    $self <NAME>           : switch to the specified namespace"
-		echo "    $self -L, --list       : list the available namespaces"
-		echo "    $self -c, --current    : show the current namespace"
-		echo "    $self -h, --help       : show this message"
+		echo "    $argv0                  : list/change namespaces"
+		echo "    $argv0 <NAME>           : switch to the specified namespace"
+		echo "    $argv0 -L, --list       : list the available namespaces"
+		echo "    $argv0 -c, --current    : show the current namespace"
+		echo "    $argv0 -h, --help       : show this message"
 		echo ""
 		echo "CONFIG:"
 		#echo "    \$kubeswitch_enable_fzf      : if set to false, fzf will not be used"
@@ -271,49 +255,46 @@ function __kubeswitch_help_kubeswitch_namespace --description="Show help for kub
 end
 
 function __kubeswitch_help_kubeswitch_kubectl_alias --description="Show help for kubeswitch kubectl-alias"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch kubectl-alias"
-	set -l self $_KS_SELF[$_KS_LEVEL]
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch kubectl-alias")
 
 	begin
 		echo "Create an alias to kubectl which runs within the kubeswitch environment."
 		echo ""
 		echo "USAGE:"
-		echo "    $self <NAME>        : create an alias to kubectl with the name <NAME>"
-		echo "    $self -h, --help    : show this message"
+		echo "    $argv0 <NAME>        : create an alias to kubectl with the name <NAME>"
+		echo "    $argv0 -h, --help    : show this message"
 	end 1>&2
 end
 
 function __kubeswitch_help_kubeswitch_inherit_env --description="Show help for kubeswitch inherit-env"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch inherit-env"
-	set -l self $_KS_SELF[$_KS_LEVEL]
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch inherit-env")
 
 	begin
 		echo "Inherit the most-recently-set kubeswitch environment from another fish instance."
 		echo ""
 		echo "USAGE:"
-		echo "    $self               : inherit the kubeswitch environment"
-		echo "    $self -h, --help    : show this message"
+		echo "    $argv0               : inherit the kubeswitch environment"
+		echo "    $argv0 -h, --help    : show this message"
 	end 1>&2
 end
 
 function __kubeswitch_help_kubeswitch_show --description="Show help for kubeswitch show"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch show"
-	set -l self $_KS_SELF[$_KS_LEVEL]
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch show")
 
 	begin
 		echo "Show info about the kubeswitch environment."
 		echo ""
 		echo "USAGE:"
-		echo "    $self                : show basic info in a human-readable format"
-		echo "    $self --porcelain    : show info in a fish eval compatible format"
-		echo "    $self --ksi          : extract user-defined metadata from the kubeswitch environment"
-		echo "    $self -h, --help     : show this message"
+		echo "    $argv0                : show basic info in a human-readable format"
+		echo "    $argv0 --porcelain    : show info in a fish eval compatible format"
+		echo "    $argv0 --ksi          : extract user-defined metadata from the kubeswitch environment"
+		echo "    $argv0 -h, --help     : show this message"
 	end 1>&2
 end
 
 function __kubeswitch_help_kubeswitch_wrapper_bin --description="Show help for kubeswitch wrapper-bin"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch show"
-	
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch wrapper-bin")
+
 	begin
 		echo "Generate a shell script that wraps the kubectl binary."
 		echo ""
@@ -330,8 +311,8 @@ end
 # -----------------------------------------------------------------------------
 
 function __kubeswitch_subcmd_config --description="Change the kubectl config file"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch config"
-	argparse -n "$_KS_SELF" -x 'help,current,list,complete-suggestions' \
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch config")
+	argparse -n "$argv0" -x 'help,current,list,complete-suggestions' \
 		'h/help' 'c/current' 'L/list' 'complete-suggestions' \
 		-- $argv || return 1
 
@@ -366,7 +347,7 @@ function __kubeswitch_subcmd_config --description="Change the kubectl config fil
 		return 0
 	else if [ (count $argv) -gt 1 ]
 		printf "%s: %s\n" \
-			"$_KS_SELF[$_KS_LEVEL]" "only one kubeconfig file may be active" 1>&2
+			"$argv0" "only one kubeconfig file may be active" 1>&2
 		return 1
 	end
 
@@ -379,8 +360,8 @@ function __kubeswitch_subcmd_config --description="Change the kubectl config fil
 end
 
 function __kubeswitch_subcmd_context --description="Change the kubectl config context"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch context"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" -x 'help,current,list,complete-suggestions' \
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch context")
+	argparse -n "$argv0" -x 'help,current,list,complete-suggestions' \
 		'h/help' 'c/current' 'L/list' 'complete-suggestions' \
 		-- $argv || return 1
 	
@@ -414,7 +395,7 @@ function __kubeswitch_subcmd_context --description="Change the kubectl config co
 		return 0
 	else if [ (count $argv) -gt 1 ]
 		printf "%s: %s\n" \
-			"$_KS_SELF[$_KS_LEVEL]" "only one kubeconfig context may be active" 1>&2
+			"$argv0" "only one kubeconfig context may be active" 1>&2
 		return 1
 	end
 
@@ -426,8 +407,8 @@ function __kubeswitch_subcmd_context --description="Change the kubectl config co
 end
 
 function __kubeswitch_subcmd_namespace --description="Change the kubectl namespace"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch namespace"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" -x 'help,current,list,complete-suggestions' \
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch namespace")
+	argparse -n "$argv0" -x 'help,current,list,complete-suggestions' \
 		'h/help' 'c/current' 'L/list' 'complete-suggestions' \
 		-- $argv || return 1
 	
@@ -461,7 +442,7 @@ function __kubeswitch_subcmd_namespace --description="Change the kubectl namespa
 		return 0
 	else if [ (count $argv) -gt 1 ]
 		printf "%s: %s\n" \
-			"$_KS_SELF[$_KS_LEVEL]" "only one kubeconfig namespace may be selected" 1>&2
+			"$argv0" "only one kubeconfig namespace may be selected" 1>&2
 		return 1
 	end
 
@@ -553,8 +534,8 @@ function __kubeswitch_subcmd_kubectl --description="Run kubectl within the kubes
 end
 
 function __kubeswitch_subcmd_kubectl_alias --description="Create an alias for kubectl"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch kubectl-alias"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'help' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch kubectl-alias")
+	argparse -n "$argv0" 'help' -- $argv || return 1
 
 	# Handle the --help flag.
 	if [ -n "$_flag_help" ]
@@ -565,7 +546,7 @@ function __kubeswitch_subcmd_kubectl_alias --description="Create an alias for ku
 	# Validate an alias is provided.
 	set -l alias "$argv[1]"
 	if [ -z "$alias" ]
-		echo "$_KS_SELF[$_KS_LEVEL]: an alias name must be provided" 1>&2
+		echo "$argv0: an alias name must be provided" 1>&2
 		return 1
 	end
 
@@ -580,8 +561,8 @@ function __kubeswitch_subcmd_kubectl_alias --description="Create an alias for ku
 end
 
 function __kubeswitch_subcmd_inherit_env --description="Inherit kubeswitch environment"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch inherit-env"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'help' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch inherit-env")
+	argparse -n "$argv0" 'help' -- $argv || return 1
 
 	# Handle the --help flag.
 	if [ -n "$_flag_help" ]
@@ -605,8 +586,8 @@ function __kubeswitch_subcmd_inherit_env --description="Inherit kubeswitch envir
 end
 
 function __kubeswitch_subcmd_show --description="Inherit kubeswitch environment"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch show"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" -x 'help,porcelain,ksi' \
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch show")
+	argparse -n "$argv0" -x 'help,porcelain,ksi' \
 		'help' 'porcelain' 'ksi' -- $argv || return 1
 
 	# Handle the --help flag.
@@ -616,8 +597,8 @@ function __kubeswitch_subcmd_show --description="Inherit kubeswitch environment"
 	end
 
 	# Handle the --porcelain flag.
-	set -g _KS_PORCELAIN[$_KS_LEVEL] false
-	[ -n "$_flag_porcelain" ] && set _KS_PORCELAIN[$_KS_LEVEL] true
+	__kubeswitch_ksvar_set porcelain false
+	[ -n "$_flag_porcelain" ] && __kubeswitch_ksvar_set porcelain true
 
 	# Print variables about the kubeswitch environment.
 	set -l kube_config    (__kubeswitch_current_kubeconfig)
@@ -663,7 +644,7 @@ function __kubeswitch_subcmd_show --description="Inherit kubeswitch environment"
 
 	# Run the yq command.
 	if [ (count $ksi_yq) -gt 0 ]
-		if [ "$_KS_PORCELAIN"[$_KS_LEVEL] = true ]
+		if [ (__kubeswitch_ksvar porcelain) = "true" ]
 			__kubeswitch_util_show ($ksi_yq | string collect --no-trim-newlines) \
 				--var="KSI_YAML"
 		else
@@ -671,7 +652,7 @@ function __kubeswitch_subcmd_show --description="Inherit kubeswitch environment"
 				echo "--- user-defined information ---"
 			end
 
-			if [ "$_KS_COLOR[$_KS_LEVEL]" = true ]
+			if [ (__kubeswitch_ksvar use_color) = "true" ]
 				set ksi_yq $ksi_yq[1] '--colors' $ksi_yq[2..-1]
 			else
 				set ksi_yq $ksi_yq[1] '--no-colors' $ksi_yq[2..-1]
@@ -685,13 +666,12 @@ function __kubeswitch_subcmd_show --description="Inherit kubeswitch environment"
 	end
 
 	# Cleanup.
-	set -g -e _KS_PORCELAIN
 	return 0
 end
 
 function __kubeswitch_subcommand_wrapper_bin --description="Generate a shell script that wraps the kubectl binary"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "kubeswitch wrapper-bin"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'help' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "kubeswitch wrapper-bin")
+	argparse -n "$argv0" 'help' -- $argv || return 1
 
 	# Handle the --help flag.
 	if [ -n "$_flag_help" ]
@@ -777,7 +757,7 @@ function __kubeswitch_util_filename --description="Extract the file name from a 
 end
 
 function __kubeswitch_util_color --description="Print the first available color"
-	if [ "$_KS_COLOR[$_KS_LEVEL]" != true ]
+	if [ (__kubeswitch_ksvar use_color) != "true" ]
 		return 0
 	end
 
@@ -820,7 +800,7 @@ function __kubeswitch_util_color --description="Print the first available color"
 end
 
 function __kubeswitch_util_message --description="Prints a message"
-	if [ "$_KS_QUIET[$_KS_LEVEL]" = "true" ]
+	if [ (__kubeswitch_ksvar quiet) = "true" ]
 		return 0
 	end
 
@@ -837,7 +817,7 @@ function __kubeswitch_util_show --description="Prints info about a kubeswitch en
 	argparse 'var=' 'description=' 'porcelain-only' -- $argv || return 1
 
 	# If porcelain mode, print it in a fish-eval'able format.
-	if [ "$_KS_PORCELAIN[$_KS_LEVEL]" = "true" ]
+	if [ (__kubeswitch_ksvar porcelain) = "true" ]
 		printf "set -l %s" $_flag_var
 		if [ (count $argv) -gt 0 ]
 			printf ' %s' (string escape $argv)
@@ -1019,8 +999,8 @@ end
 # -----------------------------------------------------------------------------
 
 function __kubeswitch_current_kubeconfig --description="Get the current kubectl config file"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_current_kubeconfig"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'x-no-options' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_current_kubeconfig")
+	argparse -n "$argv0" 'x-no-options' -- $argv || return 1
 
 	if [ -n "$KUBECONFIG" ]
 		echo "$KUBECONFIG"
@@ -1035,8 +1015,8 @@ end
 #   --abort-on-warning  :: Aborts if a warning is encountered.
 #
 function __kubeswitch_list_kubeconfig --description="List all kubectl config files"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_list_kubeconfig"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'absolute' 'abort-on-warning' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_list_kubeconfig")
+	argparse -n "$argv0" 'absolute' 'abort-on-warning' -- $argv || return 1
 	
 	# Make sure a default search path is set.
 	set -l kubeswitch_kubeconfig_path $kubeswitch_kubeconfig_path
@@ -1095,30 +1075,30 @@ function __kubeswitch_list_kubeconfig --description="List all kubectl config fil
 end
 
 function __kubeswitch_change_kubeconfig --description="Change the current kubectl config file"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_change_kubeconfig"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'x-no-options' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_change_kubeconfig")
+	argparse -n "$argv0" 'x-no-options' -- $argv || return 1
 
 	set -l kubefile "$argv[1]"
 
 	# Validate the provided kubeconfig file path is a file.
 	if [ -z "$kubefile" ]
-		echo "$_KS_SELF[$_KS_LEVEL]: an argument must be provided" 1>&2
+		echo "$argv0: an argument must be provided" 1>&2
 		return 1
 	end
 
 	if ! [ -e "$kubefile" ]
-		echo "$_KS_SELF[$_KS_LEVEL]: kubeconfig file '$kubefile' does not exist" 1>&2
+		echo "$argv0: kubeconfig file '$kubefile' does not exist" 1>&2
 		return 1
 	end
 
 	if ! [ -f "$kubefile" ]
-		echo "$_KS_SELF[$_KS_LEVEL]: kubeconfig file '$kubfile' is not a file" 1>&2
+		echo "$argv0: kubeconfig file '$kubfile' is not a file" 1>&2
 		return 1
 	end
 
 	# Abort if safe mode is enabled.
 	if [ "$__kubeswitch_safe_mode" = "true" ]
-		echo "$_: cannot change kubeconfig file from kubectl wrapper binary" 1>&2
+		echo "$argv0: cannot change kubeconfig file from kubectl wrapper binary" 1>&2
 		return 20
 	end
 
@@ -1162,13 +1142,13 @@ end
 #   --only-path    :: Only use the search path.
 #
 function __kubeswitch_resolve_kubeconfig --description="Resolve a kubeconfig file"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_resolve_kubeconfig"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'only-path' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_resolve_kubeconfig")
+	argparse -n "$argv0" 'only-path' -- $argv || return 1
 
 	# Validate the provided kubeconfig file name is provided.
 	set -l kubefile "$argv[1]"
 	if [ -z "$kubefile" ]
-		echo "$_KS_SELF[$_KS_LEVEL]: an argument must be provided" 1>&2
+		echo "$argv0: an argument must be provided" 1>&2
 		return 1
 	end
 
@@ -1177,7 +1157,7 @@ function __kubeswitch_resolve_kubeconfig --description="Resolve a kubeconfig fil
 		switch "$kubefile"
 		case "./*" "../*" "/*"
 			if ! [ -f "$kubefile" ]
-				echo "$_KS_SELF[$_KS_LEVEL]: kubeconfig file '$kubefile' does not exist" 1>&2
+				echo "$argv0: kubeconfig file '$kubefile' does not exist" 1>&2
 				return 1
 			end
 
@@ -1197,7 +1177,7 @@ function __kubeswitch_resolve_kubeconfig --description="Resolve a kubeconfig fil
 	end
 
 	# Couldn't find it.	
-	echo "$_KS_SELF[$_KS_LEVEL]: kubeconfig file '$kubefile' does not exist" 1>&2
+	echo "$argv0: kubeconfig file '$kubefile' does not exist" 1>&2
 	return 1
 end
 
@@ -1208,8 +1188,8 @@ end
 # -----------------------------------------------------------------------------
 
 function __kubeswitch_current_context --description="Get the current kubectl context"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_current_context"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'x-no-options' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_current_context")
+	argparse -n "$argv0" 'x-no-options' -- $argv || return 1
 
 	if [ -n "$KUBESWITCH_CONTEXT" ]
 		echo "$KUBESWITCH_CONTEXT"
@@ -1219,8 +1199,8 @@ function __kubeswitch_current_context --description="Get the current kubectl con
 end
 
 function __kubeswitch_list_context --description="List all kubectl contexts"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_list_context"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'x-no-options' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_list_context")
+	argparse -n "$argv0" 'x-no-options' -- $argv || return 1
 
 	__kubeswitch_real_kubectl config get-contexts --output="name" || return 1
 end
@@ -1230,25 +1210,25 @@ end
 #   --universal  :: Changes the default context of the kubeconfig file.
 #
 function __kubeswitch_change_context --description="Change the current kubectl context"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_change_context"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'U/universal' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_change_context")
+	argparse -n "$argv0" 'U/universal' -- $argv || return 1
 
 	# Validate the provided context exists.
 	set -l context "$argv[1]"
 	if [ -z "$context" ]
-		echo "$_: an argument must be provided" 1>&2
+		echo "$argv0: an argument must be provided" 1>&2
 		return 1
 	end
 
 	if ! contains -- "$context" (__kubeswitch_list_context)
-		echo "$_: kubeconfig context '$context' does not exist" 1>&2
+		echo "$argv0: kubeconfig context '$context' does not exist" 1>&2
 		return 1
 	end
 
 	# Abort if safe mode is enabled.
 	echo "HI"
 	if [ "$__kubeswitch_safe_mode" = "true" ]
-		echo "$_: cannot change context from kubectl wrapper binary" 1>&2
+		echo "$argv0: cannot change context from kubectl wrapper binary" 1>&2
 		return 20
 	end
 
@@ -1299,8 +1279,8 @@ end
 # -----------------------------------------------------------------------------
 
 function __kubeswitch_current_namespace --description="Get the current kubectl namespace"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_current_namespace"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'x-no-options' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_current_namespace")
+	argparse -n "$argv0" 'x-no-options' -- $argv || return 1
 
 	if [ -n "$KUBESWITCH_NAMESPACE" ]
 		echo "$KUBESWITCH_NAMESPACE"
@@ -1313,8 +1293,8 @@ function __kubeswitch_current_namespace --description="Get the current kubectl n
 end
 
 function __kubeswitch_list_namespace --description="List all kubectl namespaces"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_list_namespace"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'x-no-options' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_list_namespace")
+	argparse -n "$argv0" 'x-no-options' -- $argv || return 1
 
 	string replace --regex -- \
 		'^namespace/' '' \
@@ -1328,26 +1308,26 @@ end
 #   --universal  :: Changes the namespace of the kubeconfig file's current context.
 #
 function __kubeswitch_change_namespace --description="Change the current kubectl namepsace"
-	[ -n "$_KS_SELF[$_KS_LEVEL]" ] || set -l _KS_SELF[$_KS_LEVEL] "__kubeswitch_change_namespace"
-	argparse -n "$_KS_SELF[$_KS_LEVEL]" 'U/universal' 'V/validate' -- $argv || return 1
+	set -l argv0 (__kubeswitch_ksvar argv0 || echo "__kubeswitch_change_namespace")
+	argparse -n "$argv0" 'U/universal' 'V/validate' -- $argv || return 1
 
 	# Validate the provided namespace exists.
 	set -l namespace "$argv[1]"
 	if [ -z "$namespace" ]
-		echo "$_: an argument must be provided" 1>&2
+		echo "$argv0: an argument must be provided" 1>&2
 		return 1
 	end
 
 	if [ -n "$_flag_validate" ]
 		if ! contains -- "$namespace" (__kubeswitch_list_namespace)
-			echo "$_: namespace '$namespace' does not exist" 1>&2
+			echo "$argv0: namespace '$namespace' does not exist" 1>&2
 			return 1
 		end
 	end
 
 	# Abort if safe mode is enabled.
 	if [ "$__kubeswitch_safe_mode" = "true" ]
-		echo "$_: cannot change namespace from kubectl wrapper binary" 1>&2
+		echo "$argv0: cannot change namespace from kubectl wrapper binary" 1>&2
 		return 20
 	end
 
