@@ -1226,7 +1226,6 @@ function __kubeswitch_change_context --description="Change the current kubectl c
 	end
 
 	# Abort if safe mode is enabled.
-	echo "HI"
 	if [ "$__kubeswitch_safe_mode" = "true" ]
 		echo "$argv0: cannot change context from kubectl wrapper binary" 1>&2
 		return 20
